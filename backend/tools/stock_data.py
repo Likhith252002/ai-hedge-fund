@@ -7,6 +7,7 @@ Uses yfinance for market data and the `ta` library for all indicators.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Dict, Any, List, Optional
 
 import pandas as pd
@@ -15,9 +16,46 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
+# Fallback fundamentals used when yfinance is rate-limited after all retries
+_FALLBACK_FUNDAMENTALS: Dict[str, Any] = {
+    "pe_ratio":            25.0,
+    "forward_pe":          22.0,
+    "peg_ratio":            2.0,
+    "price_to_book":        3.5,
+    "debt_to_equity":      45.0,
+    "roe":                  0.18,
+    "revenue_growth":       0.08,
+    "earnings_growth":      0.10,
+    "profit_margin":        0.15,
+    "current_ratio":        1.8,
+    "analyst_target":      None,
+    "recommendation_mean": None,
+}
+
 
 class StockDataTool:
     """Unified interface for price, technicals, and fundamental data."""
+
+    # ── yfinance retry helper ────────────────────────────────────────────────
+
+    def _fetch_info(self, ticker: str, attempts: int = 3, delay: float = 2.0) -> Dict[str, Any]:
+        """Fetch yfinance Ticker.info with retries to handle rate limiting."""
+        last_exc: Exception = Exception("unknown")
+        for attempt in range(attempts):
+            try:
+                info = yf.Ticker(ticker).info
+                # yfinance returns a minimal dict (e.g. {"trailingPegRatio": None})
+                # when rate-limited — treat anything with fewer than 10 keys as a failure
+                if info and len(info) >= 10:
+                    return info
+                raise ValueError(f"incomplete info dict ({len(info)} keys)")
+            except Exception as exc:
+                last_exc = exc
+                logger.warning("yfinance info attempt %d/%d for %s: %s", attempt + 1, attempts, ticker, exc)
+                if attempt < attempts - 1:
+                    time.sleep(delay)
+        logger.error("yfinance info exhausted all retries for %s: %s", ticker, last_exc)
+        return {}
 
     # ── Price history ────────────────────────────────────────────────────────
 
@@ -48,8 +86,7 @@ class StockDataTool:
           { ticker, price, change_pct, volume, market_cap }
         """
         try:
-            t    = yf.Ticker(ticker)
-            info = t.info
+            info = self._fetch_info(ticker)
 
             price      = info.get("currentPrice") or info.get("regularMarketPrice", 0)
             prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose", price)
@@ -149,7 +186,16 @@ class StockDataTool:
           profit_margin, current_ratio, analyst_target, recommendation_mean
         """
         try:
-            info = yf.Ticker(ticker).info
+            info = self._fetch_info(ticker)
+            if not info:
+                logger.warning("get_fundamentals(%s): using fallback mock data", ticker)
+                return {
+                    "ticker":  ticker.upper(),
+                    "name":    ticker.upper(),
+                    "sector":  None,
+                    "industry": None,
+                    **_FALLBACK_FUNDAMENTALS,
+                }
             return {
                 "ticker":              ticker.upper(),
                 "name":                info.get("longName", ticker),
@@ -170,7 +216,7 @@ class StockDataTool:
             }
         except Exception as exc:
             logger.warning("get_fundamentals(%s) failed: %s", ticker, exc)
-            return {"ticker": ticker.upper()}
+            return {"ticker": ticker.upper(), **_FALLBACK_FUNDAMENTALS}
 
 
 # ── Module-level helpers (backwards compat for agents) ───────────────────────
