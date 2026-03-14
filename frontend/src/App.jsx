@@ -1,19 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import TickerInput      from "./components/TickerInput";
 import AgentStream      from "./components/AgentStream";
 import StockChart       from "./components/StockChart";
 import DecisionCard     from "./components/DecisionCard";
 import PortfolioTracker from "./components/PortfolioTracker";
+import { useWebSocket } from "./hooks/useWebSocket";
 
-const API    = import.meta.env.VITE_API_URL || "http://localhost:8000";
-const WS_URL = import.meta.env.VITE_WS_URL  || "ws://localhost:8000";
-
-function wsBase() {
-  if (WS_URL) return WS_URL;
-  if (API.startsWith("https://")) return API.replace("https://", "wss://");
-  if (API.startsWith("http://"))  return API.replace("http://",  "ws://");
-  return "";
-}
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 /** Live UTC clock */
 function LiveClock() {
@@ -42,12 +35,12 @@ export default function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [wsStatus,    setWsStatus]   = useState("idle"); // idle | connecting | live | done | error
 
-  const wsRef = useRef(null);
+  const { connect, disconnect } = useWebSocket();
 
   const ORDER = ["research_quant", "bull", "bear", "decide"];
 
   async function handleAnalyse(t) {
-    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    disconnect();
 
     setTicker(t);
     setLoading(true);
@@ -65,48 +58,42 @@ export default function App() {
       .then((d) => setOhlcv(d.ohlcv ?? []))
       .catch(() => {});
 
-    const base = wsBase();
-    const url  = `${base}/ws/analyse`;
-
     try {
       await new Promise((resolve, reject) => {
-        const ws = new WebSocket(url);
-        wsRef.current = ws;
+        const ws = connect({
+          onOpen: () => {
+            setWsStatus("live");
+            ws.send(JSON.stringify({ ticker: t, use_llm: !!import.meta.env.VITE_USE_LLM }));
+          },
+          onMessage: (evt) => {
+            let msg;
+            try { msg = JSON.parse(evt.data); } catch { return; }
 
-        ws.onopen = () => {
-          setWsStatus("live");
-          ws.send(JSON.stringify({ ticker: t, use_llm: !!import.meta.env.VITE_USE_LLM }));
-        };
+            if (msg.event === "agent_complete") {
+              const { event: _e, agent, label: _l, ...data } = msg;
+              setStreamState((prev) => ({ ...(prev ?? {}), ...data }));
+              const nextIdx = ORDER.indexOf(agent) + 1;
+              setActiveNode(nextIdx < ORDER.length ? ORDER[nextIdx] : null);
+            }
 
-        ws.onmessage = (evt) => {
-          let msg;
-          try { msg = JSON.parse(evt.data); } catch { return; }
+            if (msg.event === "complete") {
+              setResult(msg.result);
+              setIsStreaming(false);
+              setActiveNode(null);
+              setLoading(false);
+              setWsStatus("done");
+              resolve();
+            }
 
-          if (msg.event === "agent_complete") {
-            const { event: _e, agent, label: _l, ...data } = msg;
-            setStreamState((prev) => ({ ...(prev ?? {}), ...data }));
-            const nextIdx = ORDER.indexOf(agent) + 1;
-            setActiveNode(nextIdx < ORDER.length ? ORDER[nextIdx] : null);
-          }
-
-          if (msg.event === "complete") {
-            setResult(msg.result);
-            setIsStreaming(false);
-            setActiveNode(null);
-            setLoading(false);
-            setWsStatus("done");
-            resolve();
-          }
-
-          if (msg.event === "error") {
-            reject(new Error(msg.message));
-          }
-        };
-
-        ws.onerror = () => reject(new Error("WebSocket connection failed — is the backend running?"));
-        ws.onclose = (e) => {
-          if (!e.wasClean && wsStatus === "live") reject(new Error("WebSocket closed unexpectedly"));
-        };
+            if (msg.event === "error") {
+              reject(new Error(msg.message));
+            }
+          },
+          onError: () => reject(new Error("WebSocket connection failed — is the backend running?")),
+          onClose: (e) => {
+            if (!e.wasClean && wsStatus === "live") reject(new Error("WebSocket closed unexpectedly"));
+          },
+        });
       });
     } catch (err) {
       setError(err.message);

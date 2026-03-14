@@ -28,14 +28,10 @@ app = FastAPI(
     version     = "1.0.0",
 )
 
-_default_origins = "http://localhost:5173,http://localhost:4173"
-_origins = os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
-# allow_credentials cannot be True when allow_origins=["*"] (CORS spec restriction)
-_wildcard = _origins == ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = _origins,
-    allow_credentials = not _wildcard,
+    allow_origins     = ["*"],
+    allow_credentials = False,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
 )
