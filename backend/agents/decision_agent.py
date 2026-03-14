@@ -2,11 +2,13 @@
 decision_agent.py
 Synthesises bull + bear theses and quant signals into a final
 investment decision with confidence score and position sizing.
+Always calls the Claude LLM — never uses rule-based fallback.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -70,45 +72,41 @@ class DecisionAgent:
         sma_50 = ind.get("sma_50", 0)
         sma_cross = f"{sma_20:.2f} {'>' if sma_20 > sma_50 else '<'} {sma_50:.2f}"
 
-        if self.llm:
-            from langchain_core.messages import HumanMessage
-            prompt = DECISION_PROMPT.format(
-                ticker              = ticker,
-                current_price       = current_price,
-                rsi_14              = ind.get("rsi_14", "N/A"),
-                macd                = ind.get("macd", "N/A"),
-                sma_cross           = sma_cross,
-                price_vs_52w_high   = ind.get("price_vs_52w_high", "N/A"),
-                pe_ratio            = fund.get("pe_ratio", "N/A"),
-                forward_pe          = fund.get("forward_pe", "N/A"),
-                roe                 = _pct(fund.get("roe")),
-                revenue_growth      = _pct(fund.get("revenue_growth")),
-                analyst_target      = fund.get("analyst_target", "N/A"),
-                bull_thesis         = state.get("bull_thesis", ""),
-                bear_thesis         = state.get("bear_thesis", ""),
-                quant_signal        = state.get("quant_signal", "NEUTRAL"),
+        # Always use Claude — prefer injected llm, otherwise build one from env
+        llm = self.llm
+        if llm is None:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "ANTHROPIC_API_KEY is not set. DecisionAgent requires the Claude API."
+                )
+            from langchain_anthropic import ChatAnthropic
+            llm = ChatAnthropic(
+                model="claude-sonnet-4-6",
+                temperature=0.3,
+                anthropic_api_key=api_key,
             )
-            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-            raw = response.content
-            decision = _parse_decision(raw)
-            decision["current_price"] = current_price
-        else:
-            signal = state.get("quant_signal", "NEUTRAL")
-            analyst_target = fund.get("analyst_target")
-            upside = (
-                round(((analyst_target - current_price) / current_price) * 100, 1)
-                if analyst_target and current_price else None
-            )
-            rationale = f"Rule-based decision from quant signal: {signal}"
-            if upside is not None:
-                rationale += f"; analyst target implies {upside:+.1f}% upside"
-            decision = {
-                "action":        signal if signal != "NEUTRAL" else "HOLD",
-                "confidence":    60 if signal != "NEUTRAL" else 40,
-                "position_size": 5  if signal != "NEUTRAL" else 0,
-                "rationale":     rationale,
-                "current_price": current_price,
-            }
+
+        from langchain_core.messages import HumanMessage
+        prompt = DECISION_PROMPT.format(
+            ticker              = ticker,
+            current_price       = current_price,
+            rsi_14              = ind.get("rsi_14", "N/A"),
+            macd                = ind.get("macd", "N/A"),
+            sma_cross           = sma_cross,
+            price_vs_52w_high   = ind.get("price_vs_52w_high", "N/A"),
+            pe_ratio            = fund.get("pe_ratio", "N/A"),
+            forward_pe          = fund.get("forward_pe", "N/A"),
+            roe                 = _pct(fund.get("roe")),
+            revenue_growth      = _pct(fund.get("revenue_growth")),
+            analyst_target      = fund.get("analyst_target", "N/A"),
+            bull_thesis         = state.get("bull_thesis", ""),
+            bear_thesis         = state.get("bear_thesis", ""),
+            quant_signal        = state.get("quant_signal", "NEUTRAL"),
+        )
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        decision = _parse_decision(response.content)
+        decision["current_price"] = current_price
 
         state["decision"] = decision
         logger.info(
