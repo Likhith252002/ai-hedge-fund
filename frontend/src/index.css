@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: #050508;
+  color: #c9d1d9;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Custom scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar               { width: 4px; height: 4px; }
+::-webkit-scrollbar-track         { background: #0a0c10; }
+::-webkit-scrollbar-thumb         { background: #1e2535; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover   { background: #2d3748; }
+
+/* ── Bloomberg scanline overlay on header ────────────────────────────── */
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Panel header accent bar ──────────────────────────────────────────── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4b5563;
+  margin-bottom: 12px;
+}
+.panel-header::before {
+  content: "";
+  width: 3px;
+  height: 12px;
+  background: #f59e0b;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* ── Confidence bar fill blocks ────────────────────────────────────────── */
+.conf-bar {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: -1px;
+}
+
+/* ── Live dot blink ─────────────────────────────────────────────────────── */
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+.live-dot { animation: blink-dot 1.4s ease-in-out infinite; }
+
+/* ── Agent log entry slide in ──────────────────────────────────────────── */
+@keyframes log-slide {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.log-entry { animation: log-slide 0.25s ease-out; }
+
+/* ── Number ticker (price change) ──────────────────────────────────────── */
+@keyframes tick-up {
+  0%   { color: #00d964; }
+  100% { color: inherit; }
+}
+@keyframes tick-down {
+  0%   { color: #ff2d55; }
+  100% { color: inherit; }
+}
+.tick-up   { animation: tick-up   0.8s ease-out; }
+.tick-down { animation: tick-down 0.8s ease-out; }
