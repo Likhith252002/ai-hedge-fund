@@ -1,0 +1,25 @@
+services:
+  # ── Backend (FastAPI / WebSocket) ──────────────────────────────────────────
+  - type: web
+    name: ai-hedge-fund-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false          # set in Render dashboard
+      - key: ALLOWED_ORIGINS
+        value: "*"           # frontend static site origin is not fixed at build time
+
+  # ── Frontend (Vite / React static site) ───────────────────────────────────
+  - type: static
+    name: ai-hedge-fund-frontend
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false          # set to https://<backend-service>.onrender.com
+      - key: VITE_WS_URL
+        sync: false          # set to wss://<backend-service>.onrender.com
