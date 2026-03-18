@@ -1,7 +1,18 @@
 import { useRef } from "react";
 
-const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8000";
-const url = `${wsUrl}/ws/analyse`;
+function resolveWsUrl() {
+  // Explicit override wins (set at build time via VITE_WS_URL env var).
+  if (import.meta.env.VITE_WS_URL) {
+    return `${import.meta.env.VITE_WS_URL}/ws/analyse`;
+  }
+  // In production (non-localhost), derive wss:// from the page origin so
+  // nginx can proxy /ws/* without needing a separate port in the URL.
+  if (window.location.hostname !== "localhost") {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}/ws/analyse`;
+  }
+  return "ws://localhost:8000/ws/analyse";
+}
 
 /**
  * useWebSocket
@@ -17,7 +28,7 @@ export function useWebSocket() {
       wsRef.current = null;
     }
 
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(resolveWsUrl());
     wsRef.current = ws;
 
     if (onOpen)    ws.onopen    = onOpen;

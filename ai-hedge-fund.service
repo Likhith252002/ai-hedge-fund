@@ -1,0 +1,15 @@
+[Unit]
+Description=AI Hedge Fund Backend
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ai-hedge-fund/backend
+Environment="PATH=/home/ubuntu/ai-hedge-fund/venv/bin"
+EnvironmentFile=/home/ubuntu/ai-hedge-fund/.env
+ExecStart=/home/ubuntu/ai-hedge-fund/venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
