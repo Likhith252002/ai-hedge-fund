@@ -19,16 +19,43 @@ logger = logging.getLogger(__name__)
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 _POS_WORDS = {
-    "surge", "soar", "beat", "profit", "growth", "record", "gain", "rally",
-    "strong", "upgrade", "bullish", "outperform", "exceed", "positive",
-    "revenue", "expand", "innovation", "breakthrough", "dividend", "buy",
-    "rise", "high", "jump", "boost", "success", "win", "confident", "robust",
+    # price action
+    "surge", "soar", "jump", "rally", "rise", "climb", "gain", "spike", "boom",
+    # earnings/results
+    "beat", "beats", "topped", "exceeded", "exceeds", "outpaced", "surpassed",
+    "record", "records", "milestone", "high", "above",
+    # financial health
+    "profit", "profits", "profitable", "growth", "grows", "revenue", "revenues",
+    "earnings", "dividend", "dividends", "strong", "robust", "solid", "healthy",
+    # analyst actions
+    "upgrade", "upgraded", "outperform", "buy", "overweight", "positive",
+    "bullish", "optimistic", "confident",
+    # business actions
+    "expand", "expansion", "expansion", "innovation", "innovate", "breakthrough",
+    "launch", "launches", "launched", "acquisition", "acquires", "partnership",
+    "partnerships", "deal", "deals", "wins", "win", "success", "approve", "approved",
+    "announces", "announced", "boost", "boosts", "boasted", "raised", "raises",
 }
 _NEG_WORDS = {
-    "fall", "drop", "miss", "loss", "decline", "layoff", "cut", "downgrade",
-    "bearish", "underperform", "negative", "weak", "debt", "lawsuit", "fine",
-    "recall", "fraud", "crash", "sell", "low", "plunge", "risk", "concern",
-    "warn", "struggle", "disappoint", "deficit", "volatile", "fear",
+    # price action
+    "fall", "falls", "fell", "drop", "drops", "dropped", "decline", "declines",
+    "declined", "plunge", "plunges", "crash", "crashes", "slump", "slumps",
+    "tumble", "tumbles", "slide", "slides",
+    # earnings/results
+    "miss", "misses", "missed", "below", "disappoints", "disappointed",
+    "disappointing", "disappoints", "shortfall", "shortfalls",
+    # financial health
+    "loss", "losses", "deficit", "deficits", "debt", "debts", "weak", "weakness",
+    "negative", "low", "poor", "down",
+    # analyst actions
+    "downgrade", "downgraded", "underperform", "sell", "underweight",
+    "bearish", "pessimistic",
+    # business/legal
+    "layoff", "layoffs", "cut", "cuts", "cutting", "lawsuit", "lawsuits",
+    "fine", "fines", "fraud", "recall", "recalls", "investigation", "probe",
+    "risk", "risks", "concern", "concerns", "warn", "warns", "warning",
+    "struggle", "struggles", "volatile", "volatility", "fear", "fears",
+    "slowdown", "slowdowns", "competition", "regulatory",
 }
 
 
@@ -246,9 +273,9 @@ class NewsFetcher:
     def analyze_sentiment(self, text: str) -> float:
         if not text:
             return 0.0
-        words = set(re.findall(r"\b\w+\b", text.lower()))
-        pos   = len(words & _POS_WORDS)
-        neg   = len(words & _NEG_WORDS)
+        words = re.findall(r"\b\w+\b", text.lower())
+        pos   = sum(1 for w in words if w in _POS_WORDS)
+        neg   = sum(1 for w in words if w in _NEG_WORDS)
         total = pos + neg
         if total == 0:
             return 0.0

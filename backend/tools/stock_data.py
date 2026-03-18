@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 import pandas as pd
@@ -128,6 +129,48 @@ class StockDataTool:
 
         # Backup: Yahoo Finance v8 chart API
         return self._fetch_price_v8(ticker)
+
+    def _fetch_ohlcv_v8(self, ticker: str, period: str = "3mo") -> List[Dict]:
+        """Fetch OHLCV data from Yahoo Finance v8 chart API as fallback."""
+        _period_map = {"1mo": "1mo", "3mo": "3mo", "6mo": "6mo", "1y": "1y", "2y": "2y"}
+        range_str = _period_map.get(period, "3mo")
+        try:
+            url  = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+            resp = requests.get(
+                url, headers={"User-Agent": _UA}, timeout=15,
+                params={"interval": "1d", "range": range_str},
+            )
+            resp.raise_for_status()
+            result    = resp.json()["chart"]["result"][0]
+            timestamps = result.get("timestamp", [])
+            quote      = result["indicators"]["quote"][0]
+            opens      = quote.get("open",   [])
+            highs      = quote.get("high",   [])
+            lows       = quote.get("low",    [])
+            closes     = quote.get("close",  [])
+            volumes    = quote.get("volume", [])
+            records = []
+            for i, ts in enumerate(timestamps):
+                o = opens[i]  if i < len(opens)   else None
+                h = highs[i]  if i < len(highs)   else None
+                l = lows[i]   if i < len(lows)    else None
+                c = closes[i] if i < len(closes)  else None
+                v = volumes[i] if i < len(volumes) else 0
+                if None in (o, h, l, c):
+                    continue
+                records.append({
+                    "date":   datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d"),
+                    "open":   round(float(o), 2),
+                    "high":   round(float(h), 2),
+                    "low":    round(float(l), 2),
+                    "close":  round(float(c), 2),
+                    "volume": int(v) if v else 0,
+                })
+            logger.info("_fetch_ohlcv_v8(%s): %d rows", ticker, len(records))
+            return records
+        except Exception as exc:
+            logger.error("_fetch_ohlcv_v8(%s) failed: %s", ticker, exc)
+            return []
 
     def _fetch_price_v8(self, ticker: str) -> Dict[str, Any]:
         """Fallback price via Yahoo Finance v8 chart API."""
@@ -278,18 +321,20 @@ def get_fundamentals(ticker: str)               -> Dict:  return _tool.get_funda
 def get_price_history(ticker: str, period="6mo") -> pd.DataFrame: return _tool.get_price_history(ticker, period)
 def get_ohlcv_list(ticker: str, period="3mo")   -> List[Dict]:
     df = _tool.get_price_history(ticker, period)
-    if df.empty:
-        return []
-    df = df.reset_index()
-    date_col = "date" if "date" in df.columns else df.columns[0]
-    return [
-        {
-            "date":   str(row[date_col])[:10],
-            "open":   round(float(row["open"]),  2),
-            "high":   round(float(row["high"]),  2),
-            "low":    round(float(row["low"]),   2),
-            "close":  round(float(row["close"]), 2),
-            "volume": int(row["volume"]),
-        }
-        for _, row in df.iterrows()
-    ]
+    if not df.empty:
+        df = df.reset_index()
+        date_col = "date" if "date" in df.columns else df.columns[0]
+        return [
+            {
+                "date":   str(row[date_col])[:10],
+                "open":   round(float(row["open"]),  2),
+                "high":   round(float(row["high"]),  2),
+                "low":    round(float(row["low"]),   2),
+                "close":  round(float(row["close"]), 2),
+                "volume": int(row["volume"]),
+            }
+            for _, row in df.iterrows()
+        ]
+    # Fallback: Yahoo Finance v8 chart API
+    logger.warning("get_ohlcv_list(%s): yfinance empty, trying v8 API", ticker)
+    return _tool._fetch_ohlcv_v8(ticker, period)
