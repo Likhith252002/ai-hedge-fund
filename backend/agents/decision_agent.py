@@ -38,25 +38,24 @@ BULL THESIS:
 BEAR THESIS:
 {bear_thesis}
 
-Based on all of the above, provide:
-1. Decision: BUY / SELL / HOLD
-2. Confidence: 0-100
-3. Suggested position size: 0-10 (% of portfolio)
-4. One-sentence rationale
+Even with limited data, you MUST make a definitive investment recommendation.
+Uncertainty is not an excuse for inaction. A real portfolio manager always decides.
 
-Respond in exactly this format (no extra text):
+Weigh the bull and bear theses against the quantitative signals and fundamentals.
+Make a concrete, specific BUY, SELL, or HOLD call with a real confidence percentage
+between 30 and 90. Confidence reflects how strongly the evidence points in one direction.
+
+Respond in exactly this format — no extra text, no explanation outside these lines:
 DECISION: <BUY|SELL|HOLD>
-CONFIDENCE: <0-100>
-POSITION_SIZE: <0-10>
-RATIONALE: <one sentence>
+CONFIDENCE: <integer between 30 and 90>
+POSITION_SIZE: <decimal between 0.0 and 10.0>
+RATIONALE: <one specific sentence referencing the actual data above>
 """
 
 
 class DecisionAgent:
     def __init__(self, llm=None):
-        # llm param kept for API compatibility but ignored —
-        # we call Anthropic directly to avoid LangChain version issues
-        pass
+        pass  # llm param kept for API compatibility but ignored
 
     async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         ticker = state["ticker"]
@@ -72,8 +71,8 @@ class DecisionAgent:
         def _pct(v):
             return f"{v*100:.1f}%" if v is not None else "N/A"
 
-        sma_20 = ind.get("sma_20", 0) or 0
-        sma_50 = ind.get("sma_50", 0) or 0
+        sma_20    = ind.get("sma_20", 0) or 0
+        sma_50    = ind.get("sma_50", 0) or 0
         sma_cross = f"{sma_20:.2f} {'>' if sma_20 > sma_50 else '<'} {sma_50:.2f}"
 
         prompt = DECISION_PROMPT.format(
@@ -93,7 +92,7 @@ class DecisionAgent:
             quant_signal      = state.get("quant_signal", "NEUTRAL"),
         )
 
-        client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        client  = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         message = await client.messages.create(
             model=_MODEL,
             max_tokens=256,
@@ -125,16 +124,18 @@ def _parse_decision(raw: str) -> Dict[str, Any]:
         action = "HOLD"
 
     try:
-        confidence = int(lines.get("CONFIDENCE", "50").replace("%", "").strip())
+        confidence = int(lines.get("CONFIDENCE", "55").replace("%", "").strip())
+        confidence = max(30, min(90, confidence))   # clamp to [30, 90]
     except ValueError:
-        confidence = 50
+        confidence = 55
 
     try:
-        position_size = float(lines.get("POSITION_SIZE", "0").replace("%", "").strip())
+        position_size = float(lines.get("POSITION_SIZE", "3").replace("%", "").strip())
+        position_size = max(0.0, min(10.0, position_size))
     except ValueError:
-        position_size = 0.0
+        position_size = 3.0
 
-    rationale = lines.get("RATIONALE", "Insufficient data for a confident decision.")
+    rationale = lines.get("RATIONALE", "Decision based on available quantitative and qualitative signals.")
 
     return {
         "action":        action,

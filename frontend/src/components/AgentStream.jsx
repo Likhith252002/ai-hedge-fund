@@ -3,6 +3,8 @@
  * Each agent shows as a row that transitions pending → running → done.
  */
 
+import ReactMarkdown from "react-markdown";
+
 const PIPELINE = [
   {
     node:   "research_quant",
@@ -74,6 +76,32 @@ function SkeletonLines() {
   );
 }
 
+/** Renders agent content — uses ReactMarkdown so prose and any residual
+    markdown both display cleanly inside the terminal theme. */
+function AgentContent({ text }) {
+  return (
+    <div className="text-xs text-terminal-text/80 font-sans leading-relaxed mt-1.5
+                    border-t border-terminal-border/50 pt-1.5 space-y-1.5">
+      <ReactMarkdown
+        components={{
+          p:      ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+          ul:     ({ children }) => <ul className="list-disc list-inside space-y-0.5">{children}</ul>,
+          ol:     ({ children }) => <ol className="list-decimal list-inside space-y-0.5">{children}</ol>,
+          li:     ({ children }) => <li>{children}</li>,
+          strong: ({ children }) => <strong className="text-terminal-text font-semibold">{children}</strong>,
+          em:     ({ children }) => <em className="text-terminal-dim italic">{children}</em>,
+          h1:     ({ children }) => <p className="font-semibold text-terminal-text">{children}</p>,
+          h2:     ({ children }) => <p className="font-semibold text-terminal-text">{children}</p>,
+          h3:     ({ children }) => <p className="font-semibold text-terminal-text">{children}</p>,
+          hr:     ()             => <hr className="border-terminal-border/40 my-1" />,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export default function AgentStream({ streamState, activeNode, isStreaming, ticker }) {
   if (!isStreaming && !streamState) return null;
 
@@ -92,10 +120,10 @@ export default function AgentStream({ streamState, activeNode, isStreaming, tick
 
       <div className="space-y-2">
         {PIPELINE.map(({ node, label, icon, accent, border, bg, extract }) => {
-          const data   = extract(streamState);
-          const isDone = !!data;
+          const data     = extract(streamState);
+          const isDone   = !!data;
           const isActive = activeNode === node;
-          const status = isDone ? "done" : isActive ? "running" : "pending";
+          const status   = isDone ? "done" : isActive ? "running" : "pending";
 
           return (
             <div
@@ -122,10 +150,7 @@ export default function AgentStream({ streamState, activeNode, isStreaming, tick
 
               {/* Content */}
               {isDone ? (
-                <p className="text-xs text-terminal-text/80 font-sans leading-relaxed whitespace-pre-line mt-1.5
-                              border-t border-terminal-border/50 pt-1.5">
-                  {data.primary}
-                </p>
+                <AgentContent text={data.primary} />
               ) : isActive ? (
                 <SkeletonLines />
               ) : null}

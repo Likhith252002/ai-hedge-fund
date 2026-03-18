@@ -1,7 +1,7 @@
 """
 bull_agent.py
 Constructs the bullish investment thesis using research + quant data.
-Calls the Anthropic API directly — no LangChain wrapper, no fallback.
+Calls the Anthropic API directly. Returns clean prose — no markdown.
 """
 
 from __future__ import annotations
@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 
 _MODEL = "claude-sonnet-4-6"
 
-BULL_PROMPT = """You are an optimistic equity analyst building a BULL case.
+BULL_PROMPT = """You are an optimistic equity analyst building a BULL case for {ticker}.
 
-Ticker: {ticker}
 Research summary: {research_summary}
 Quant signal: {quant_signal}
 
@@ -35,20 +34,19 @@ Fundamentals:
 Recent news:
 {news_headlines}
 
-Write a concise bull thesis (3-5 bullet points) covering:
-- Growth catalysts
-- Valuation upside
-- Technical momentum
-- Positive news drivers
+Write 4 concise analytical paragraphs making the strongest possible bull case.
+Cover growth catalysts, valuation upside, technical momentum, and positive news drivers.
+Reference specific numbers from above. Be direct and confident.
 
-Be specific. Reference the numbers above where relevant.
+IMPORTANT: Respond in plain prose paragraphs only. Do NOT use markdown headers (#),
+bold (**), bullet points (-), horizontal rules (---), or any other markdown syntax.
+Just write 4 clean paragraphs of analytical text separated by blank lines.
 """
 
 
 class BullAgent:
     def __init__(self, llm=None):
-        # llm param kept for API compatibility but ignored
-        pass
+        pass  # llm param kept for API compatibility but ignored
 
     async def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         ticker = state["ticker"]
@@ -87,10 +85,10 @@ class BullAgent:
             news_headlines      = news_headlines,
         )
 
-        client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        client  = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         message = await client.messages.create(
             model=_MODEL,
-            max_tokens=512,
+            max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
         bull_thesis = message.content[0].text
