@@ -16,12 +16,13 @@
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.1.14-FF6B35?style=for-the-badge&logo=chainlink&logoColor=white)](https://langchain-ai.github.io/langgraph)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Claude](https://img.shields.io/badge/Claude-Anthropic-CC785C?style=for-the-badge&logo=anthropic&logoColor=white)](https://anthropic.com)
-[![Render](https://img.shields.io/badge/Deployed_on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com)
+[![AWS EC2](https://img.shields.io/badge/Deployed_on-AWS_EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)](http://18.224.16.180)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online-brightgreen?style=for-the-badge&logo=statuspage&logoColor=white)](http://18.224.16.180)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 <br/>
 
-**[🚀 Live Demo](https://ai-hedge-fund-frontend-0ega.onrender.com)** &nbsp;•&nbsp;
+**[🚀 Live Demo](http://18.224.16.180)** &nbsp;•&nbsp;
 **[📖 Docs](#how-it-works)** &nbsp;•&nbsp;
 **[🐛 Report Bug](https://github.com/Likhith252002/ai-hedge-fund/issues)** &nbsp;•&nbsp;
 **[✨ Request Feature](https://github.com/Likhith252002/ai-hedge-fund/issues)**
@@ -38,7 +39,7 @@
 
 <div align="center">
 
-### 🌐 [https://ai-hedge-fund-frontend-0ega.onrender.com](https://ai-hedge-fund-frontend-0ega.onrender.com)
+### 🌐 [http://18.224.16.180](http://18.224.16.180)
 
 > Enter any ticker (e.g. `NVDA`, `AAPL`, `TSLA`) and watch 5 AI agents debate the stock live.
 
@@ -74,42 +75,51 @@
 │                        USER BROWSER                             │
 │              Bloomberg Terminal UI  (React + Vite)              │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │  WebSocket  /ws/analyse
+                            │  HTTP :80 / WS :80
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   FASTAPI BACKEND  (Uvicorn)                    │
-│                                                                 │
-│   REST  /api/v1/stock/{ticker}   /api/v1/news/{ticker}         │
+│                  AWS EC2  (Ubuntu 22.04)                        │
 │                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐  │
-│   │                  LANGGRAPH PIPELINE                     │  │
-│   │                                                         │  │
-│   │   ┌─────────────────┐   ┌─────────────────┐            │  │
-│   │   │  Research Agent  │   │   Quant Agent    │  ← parallel │  │
-│   │   │  fundamentals   │   │  RSI·MACD·BB    │            │  │
-│   │   └────────┬────────┘   └────────┬────────┘            │  │
-│   │            └──────────┬──────────┘                      │  │
-│   │                       ▼                                 │  │
-│   │          ┌────────────────────────┐                     │  │
-│   │          │  ┌──────┐  ┌────────┐  │  ← parallel         │  │
-│   │          │  │ Bull │  │  Bear  │  │                     │  │
-│   │          │  │Agent │  │ Agent  │  │                     │  │
-│   │          │  └──────┘  └────────┘  │                     │  │
-│   │          └────────────┬───────────┘                     │  │
-│   │                       ▼                                 │  │
-│   │              ┌─────────────────┐                        │  │
-│   │              │ Decision Engine │                        │  │
-│   │              │ BUY/SELL/HOLD + │                        │  │
-│   │              │   confidence    │                        │  │
-│   │              └─────────────────┘                        │  │
-│   └─────────────────────────────────────────────────────────┘  │
+│   │              NGINX  (reverse proxy · port 80)           │  │
+│   │   /          → /var/www/ai-hedge-fund  (static files)   │  │
+│   │   /api/*     → localhost:8000  (FastAPI REST)           │  │
+│   │   /ws/*      → localhost:8000  (WebSocket upgrade)      │  │
+│   └──────────────────────────┬──────────────────────────────┘  │
+│                               │  proxy :8000                    │
+│   ┌───────────────────────────▼──────────────────────────────┐  │
+│   │           FASTAPI BACKEND  (Uvicorn · systemd)           │  │
+│   │                                                          │  │
+│   │   ┌──────────────────────────────────────────────────┐   │  │
+│   │   │               LANGGRAPH PIPELINE                │   │  │
+│   │   │                                                  │   │  │
+│   │   │  ┌─────────────────┐  ┌─────────────────┐       │   │  │
+│   │   │  │  Research Agent │  │   Quant Agent   │ ←par  │   │  │
+│   │   │  │  fundamentals   │  │  RSI·MACD·BB    │       │   │  │
+│   │   │  └────────┬────────┘  └────────┬────────┘       │   │  │
+│   │   │           └─────────┬──────────┘                │   │  │
+│   │   │                     ▼                           │   │  │
+│   │   │       ┌─────────────────────────┐               │   │  │
+│   │   │       │  ┌──────┐  ┌────────┐   │  ← parallel   │   │  │
+│   │   │       │  │ Bull │  │  Bear  │   │               │   │  │
+│   │   │       │  │Agent │  │ Agent  │   │               │   │  │
+│   │   │       │  └──────┘  └────────┘   │               │   │  │
+│   │   │       └────────────┬────────────┘               │   │  │
+│   │   │                    ▼                            │   │  │
+│   │   │           ┌─────────────────┐                   │   │  │
+│   │   │           │ Decision Engine │                   │   │  │
+│   │   │           │ BUY/SELL/HOLD + │                   │   │  │
+│   │   │           │   confidence    │                   │   │  │
+│   │   │           └─────────────────┘                   │   │  │
+│   │   └──────────────────────────────────────────────────┘   │  │
+│   └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                             │
               ┌─────────────┴─────────────┐
               │                           │
     ┌─────────▼──────────┐    ┌──────────▼──────────┐
     │    yfinance API    │    │   Anthropic Claude   │
-    │  OHLCV · Fundamentals   │  claude-sonnet-4-6   │
+    │  OHLCV·Fundamentals│    │  claude-sonnet-4-6   │
     └────────────────────┘    └─────────────────────┘
 ```
 
@@ -151,8 +161,8 @@
 - 📰 **News Sentiment** — live news headlines scored with financial keyword analysis
 - 📊 **12+ Fundamental Metrics** — P/E, Forward P/E, PEG, P/B, ROE, D/E, margins, growth
 - 💼 **Portfolio Tracker** — add analysis results to a watchlist
-- 🔄 **Retry + Fallback** — 3-attempt retry on yfinance rate limits with graceful fallback
-- 🚀 **One-command deploy** — `render.yaml` for instant Render.com deployment
+- 🔄 **Retry + Fallback** — 3-attempt retry on yfinance rate limits with v8 API fallback
+- 🚀 **One-command redeploy** — `bash deploy.sh` rebuilds and restarts everything on EC2
 
 ---
 
@@ -168,7 +178,7 @@
 | 📊 **Market Data** | yfinance 0.2.36 | OHLCV · fundamentals · news |
 | 📈 **Technicals** | ta 0.11.0 | RSI · MACD · Bollinger · SMA |
 | 🗄️ **Validation** | Pydantic 2.5.0 | Request/response schemas |
-| 🚀 **Deployment** | Render.com | Free-tier cloud hosting |
+| 🚀 **Deployment** | AWS EC2 · Ubuntu 22.04 · nginx | Production cloud hosting |
 
 ---
 
@@ -227,7 +237,11 @@ ai-hedge-fund/
 │   │       ├── PortfolioTracker.jsx
 │   │       └── TickerInput.jsx
 │   └── vite.config.js
-├── render.yaml                 # One-click Render deploy
+├── nginx.conf                  # nginx reverse proxy config
+├── ai-hedge-fund.service       # systemd service unit
+├── deploy.sh                   # one-command redeploy script
+├── EC2_SETUP.md                # fresh EC2 setup walkthrough
+├── render.yaml                 # Render.com deploy config
 └── docker-compose.yml
 ```
 
@@ -235,23 +249,44 @@ ai-hedge-fund/
 
 ## 🌐 Deployment
 
-### Deploy to Render (recommended)
+### Production — AWS EC2
 
-The repo includes a `render.yaml` — import the repo in [Render](https://render.com) and it will configure both services automatically.
+The live demo runs on an **AWS EC2 t2.micro** (Ubuntu 22.04) behind nginx.
 
-**Environment variables to set in Render dashboard:**
+| Component | Details |
+|:---|:---|
+| Instance | AWS EC2 t2.micro · Ubuntu 22.04 LTS |
+| Web server | nginx — serves static files + proxies `/api/*` and `/ws/*` |
+| Backend | uvicorn managed by systemd (`ai-hedge-fund.service`) |
+| Frontend | React/Vite build served from `/var/www/ai-hedge-fund` |
+| URL | [http://18.224.16.180](http://18.224.16.180) |
 
-| Service | Variable | Value |
-|:---|:---|:---|
-| Backend | `ANTHROPIC_API_KEY` | Your Anthropic API key |
-| Frontend | `VITE_API_URL` | `https://your-backend.onrender.com` |
-| Frontend | `VITE_WS_URL` | `wss://your-backend.onrender.com` |
+**Fresh EC2 setup** — see [EC2_SETUP.md](EC2_SETUP.md) for the full step-by-step walkthrough.
+
+**Redeploy after pushing code changes:**
+
+```bash
+ssh -i your-key.pem ubuntu@18.224.16.180
+cd /home/ubuntu/ai-hedge-fund && bash deploy.sh
+```
+
+`deploy.sh` runs: `git pull` → `pip install` → `npm run build` → copy static files → restart systemd service → reload nginx.
 
 ### Deploy with Docker
 
 ```bash
 docker-compose up --build
 ```
+
+### Deploy to Render
+
+The repo also includes `render.yaml` — import it in [Render](https://render.com) for a one-click cloud deployment.
+
+| Variable | Service | Value |
+|:---|:---|:---|
+| `ANTHROPIC_API_KEY` | Backend | Your Anthropic API key |
+| `VITE_API_URL` | Frontend | `https://your-backend.onrender.com` |
+| `VITE_WS_URL` | Frontend | `wss://your-backend.onrender.com` |
 
 ---
 
