@@ -38,4 +38,9 @@ app.add_middleware(
 
 app.include_router(router)
 
-logger.info("AI Hedge Fund backend ready.")
+
+@app.on_event("startup")
+async def _startup() -> None:
+    from db.database import init_db
+    init_db()
+    logger.info("AI Hedge Fund backend ready.")
